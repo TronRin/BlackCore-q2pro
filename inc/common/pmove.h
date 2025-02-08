@@ -45,6 +45,7 @@ typedef struct {
     float       friction;
     float       waterfriction;
     float       flyfriction;
+    int         double_jump_used; // 0 = not used, 1 = used
 } pmoveParams_t;
 
 void Pmove(pmove_t *pmove, const pmoveParams_t *params);

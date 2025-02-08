@@ -67,13 +67,27 @@ void Pmove(pmove_t *pmove, const pmoveParams_t *params)
 {
     pm_clipmask = MASK_PLAYERSOLID;
 
-    // remaster player collision rules
+    // Remaster player collision rules
     if (params->extended_server_ver != 0) {
         if (pmove->s.pm_type == PM_DEAD || pmove->s.pm_type == PM_GIB)
             pm_clipmask = MASK_DEADSOLID;
 
         if (!(pmove->s.pm_flags & PMF_IGNORE_PLAYER_COLLISION))
             pm_clipmask |= CONTENTS_PLAYER;
+    }
+
+    // Check if the player is trying to jump
+    if (pmove->cmd.buttons & BUTTON_JUMP) {
+        if (pmove->s.pm_flags & PMF_ON_GROUND) {
+            // Player is on the ground, allow a normal jump
+            pmove->s.pm_flags &= ~PMF_ON_GROUND;
+            pmove->s.pm_flags |= PMF_JUMP_HELD;
+            pmove->double_jump_used = 0; // Reset double jump state
+        } else if (!pmove->double_jump_used) {
+            // Player is in the air and hasn't used their double jump yet
+            pmove->s.pm_flags |= PMF_JUMP_HELD;
+            pmove->double_jump_used = 1; // Mark double jump as used
+        }
     }
 
     if (params->extended_server_ver >= 2) {
@@ -83,7 +97,6 @@ void Pmove(pmove_t *pmove, const pmoveParams_t *params)
         ConvertToGame3_usercmd(&game3_pmove.cmd, &pmove->cmd);
         game3_pmove.snapinitial = pmove->snapinitial;
         game3_pmove.trace = wrap_pmove_trace;
-        // "Classic" pmove doesn't actually use clip(), so no need to set it
         game3_pmove.pointcontents = wrap_pmove_pointcontents;
 
         current_pmove_trace = pmove->trace;
@@ -96,7 +109,6 @@ void Pmove(pmove_t *pmove, const pmoveParams_t *params)
         VectorCopy(game3_pmove.mins, pmove->mins);
         VectorCopy(game3_pmove.maxs, pmove->maxs);
 
-        // See comment on trace.ent above
         pmove->groundentity = (edict_t *)game3_pmove.groundentity;
 
         pmove->watertype = game3_pmove.watertype;
@@ -108,7 +120,6 @@ void Pmove(pmove_t *pmove, const pmoveParams_t *params)
         ConvertToGame3_usercmd(&game3_pmove.cmd, &pmove->cmd);
         game3_pmove.snapinitial = pmove->snapinitial;
         game3_pmove.trace = wrap_pmove_trace;
-        // "Classic" pmove doesn't actually use clip(), so no need to set it
         game3_pmove.pointcontents = wrap_pmove_pointcontents;
 
         current_pmove_trace = pmove->trace;
@@ -121,7 +132,6 @@ void Pmove(pmove_t *pmove, const pmoveParams_t *params)
         VectorCopy(game3_pmove.mins, pmove->mins);
         VectorCopy(game3_pmove.maxs, pmove->maxs);
 
-        // See comment on trace.ent above
         pmove->groundentity = (edict_t *)game3_pmove.groundentity;
 
         pmove->watertype = game3_pmove.watertype;
@@ -136,6 +146,9 @@ void Pmove(pmove_t *pmove, const pmoveParams_t *params)
      * touches, so cheat and pretend 0 touches (and don't bother to somehow
      * produce correct touch info). */
     pmove->touch.num = 0;
+    if (pmove->s.pm_flags & PMF_ON_GROUND) {
+    pmove->double_jump_used = 0; // Reset double jump state when landing
+    }
 }
 
 void PmoveInit(pmoveParams_t *pmp)
